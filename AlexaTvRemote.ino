@@ -28,8 +28,8 @@ bool Up = false;   // command flag
 bool Down = false;   // command flag
 
 //SET YOUR WIFI CREDS 
-const char* myWifiSsid      = "WiFi@OSU"; 
-const char* myWifiPassword  = "";
+const char* myWifiSsid      = "Benny and The Jets 2.4G"; 
+const char* myWifiPassword  = "eltonjohn";
 
 //SET TO MATCH YOUR HARDWARE 
 #define SERIAL_BAUD_RATE    115200
@@ -70,6 +70,7 @@ void setup()
   //connect to wifi 
   if (wifi->connect())
   {
+    DEBUG_PRINTLN("Wifi:Connected, beginning wemulator");
     wemulator->begin();
     
     wemulator->addDevice("tv", 80, new WemoCallbackHandler(&Power)); 

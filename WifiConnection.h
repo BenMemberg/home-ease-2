@@ -79,7 +79,7 @@ bool WifiConnection::connect()
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     DEBUG_PRINT(".");
-    if (i > 10){
+    if (i > 20){
       state = false;
       break;
     }
