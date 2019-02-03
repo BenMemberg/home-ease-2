@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Adafruit_NeoPixel.h>
 #ifdef ESP32
     #include <WiFi.h>
 #else
@@ -8,7 +9,19 @@
 #include <IRsend.h>    // IR library 
 #include <IRrecv.h>
 #include <IRutils.h>
+#include <debug.h>
+//#define PIN 14
+//
+//// Parameter 1 = number of pixels in strip
+//// Parameter 2 = pin number (most are valid)
+//// Parameter 3 = pixel type flags, add together as needed:
+////   NEO_KHZ800  800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
+////   NEO_KHZ400  400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
+////   NEO_GRB     Pixels are wired for GRB bitstream (most NeoPixel products)
+////   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
+//Adafruit_NeoPixel strip = Adafruit_NeoPixel(14, PIN, NEO_GRB + NEO_KHZ800);
 
+    
 // Rename the credentials.sample.h file to credentials.h and 
 // edit it according to your router configuration
 #include "credentials.h"
@@ -19,41 +32,40 @@ fauxmoESP fauxmo;
 
 #define SERIAL_BAUDRATE     115200
 
-// #define LED_YELLOW          4
-// #define LED_GREEN           5
-// #define LED_BLUE            0
-// #define LED_PINK            2
-// #define LED_WHITE           15
+#define ID_LGTV       "LG tv"
+#define ID_LGMUTE     "LG mute"
+#define ID_LGVOLUP    "LG volume up"
+#define ID_LGVOLDOWN  "LG volume down"
 
-// #define ID_YELLOW           "yellow lamp"
-// #define ID_GREEN            "green lamp"
-// #define ID_BLUE             "blue lamp"
-// #define ID_PINK             "pink lamp"
-// #define ID_WHITE            "white lamp"
-
-#define ID_TV       "tv"
-#define ID_MUTE     "mute"
-#define ID_VOLUP    "tv volume up"
-#define ID_VOLDOWN  "tv volume down"
+#define ID_SAMTV       "Samsung tv"
+#define ID_SAMMUTE     "Samsung mute"
+#define ID_SAMVOLUP    "Samsung volume up"
+#define ID_SAMVOLDOWN  "Samsung volume down"
 
 const uint16_t kRecvPin = 14;
 const uint16_t kIrLed = 5;  // ESP8266 GPIO pin to use. Recommended: 4 (D2).
 
-int power = 0x0020DF10EF;
-int up    = 0x0020DF40BF;
-int down  = 0x0020DFC03F;
-int mute  = 0x0020DF906F;
+int lgpower = 0x0020DF10EF;
+int lgup    = 0x0020DF40BF;
+int lgdown  = 0x0020DFC03F;
+int lgmute  = 0x0020DF906F;
 int input = 0x0020DFD02F;
+
+int sampower = 0x00E0E040BF;
+int samup    = 0x00E0E0E01F;
+int samdown  = 0x00E0E0D02F;
+int sammute  = 0x00E0E0F00F;
 
 IRsend irsend(kIrLed);  // Set the GPIO to be used to sending the message.
 IRrecv irrecv(kRecvPin);
 
 // -----------------------------------------------------------------------------
 //turn on/off the tv by sending IR command
-void togglePower();
-void muteVolume();
-void volumeUp();
-void volumeDown();
+void toggleLG(int);
+void toggleSam(int);
+void volumeLG(int, unsigned char);
+void volumeSam(int, unsigned char);
+void flash(int);
 
 // -----------------------------------------------------------------------------
 // Wifi
@@ -81,7 +93,15 @@ void wifiSetup() {
 }
 
 void setup() {
-
+  
+//    strip.begin();
+//    strip.setBrightness(100);
+//    strip.show(); // Initialize all pixels to 'off'
+//    for(int16_t j=0; j<strip.numPixels(); j++){
+//      strip.setPixelColor(j,0,0,0);
+//      strip.show();
+//    }
+    
     // Init serial port and clean garbage
     Serial.begin(SERIAL_BAUDRATE);
     Serial.println();
@@ -113,10 +133,14 @@ void setup() {
     // "Alexa, set yellow lamp to fifty" (50 means 50% of brightness, note, this example does not use this functionality)
 
     // Add virtual devices
-    fauxmo.addDevice(ID_TV     );
-    fauxmo.addDevice(ID_MUTE   );
-    fauxmo.addDevice(ID_VOLUP  );
-    fauxmo.addDevice(ID_VOLDOWN);
+    fauxmo.addDevice(ID_LGTV     );
+    fauxmo.addDevice(ID_LGMUTE   );
+    fauxmo.addDevice(ID_LGVOLUP  );
+    fauxmo.addDevice(ID_LGVOLDOWN);
+    fauxmo.addDevice(ID_SAMTV     );
+    fauxmo.addDevice(ID_SAMMUTE   );
+    fauxmo.addDevice(ID_SAMVOLUP  );
+    fauxmo.addDevice(ID_SAMVOLDOWN);
 
     fauxmo.onSetState([](unsigned char device_id, const char * device_name, bool state, unsigned char value) {
         
@@ -131,14 +155,22 @@ void setup() {
         // Checking for device_id is simpler if you are certain about the order they are loaded and it does not change.
         // Otherwise comparing the device_name is safer.
 
-        if (strcmp(device_name, ID_TV)==0) {
-            togglePower();
-        } else if (strcmp(device_name, ID_MUTE)==0) {
-            muteVolume();
-        } else if (strcmp(device_name, ID_VOLUP)==0) {
-            volumeUp();
-        } else if (strcmp(device_name, ID_VOLDOWN)==0) {
-            volumeDown();
+        if (strcmp(device_name, ID_LGTV)==0) {
+            toggleLG(lgpower);
+        } else if (strcmp(device_name, ID_LGMUTE)==0) {
+            toggleLG(lgmute);
+        } else if (strcmp(device_name, ID_LGVOLUP)==0) {
+            volumeLG(lgup, value);
+        } else if (strcmp(device_name, ID_LGVOLDOWN)==0) {
+            volumeLG(lgdown, value);
+        } else if (strcmp(device_name, ID_SAMTV)==0) {
+            toggleSam(sampower);
+        } else if (strcmp(device_name, ID_SAMMUTE)==0) {
+            toggleSam(sammute);
+        } else if (strcmp(device_name, ID_SAMVOLUP)==0) {
+            volumeSam(samup, value);
+        } else if (strcmp(device_name, ID_SAMVOLDOWN)==0) {
+            volumeSam(samdown, value);
         }
     });
 
@@ -164,27 +196,67 @@ void loop() {
 
 }
 
-void toggleTv()
+void toggleLG(int code)
 {
-  debugPrintln("Sending IR command to toggle tv");  
-  irsend.sendNEC(power, 32); 
+  Serial.println("Sending IR toggle command to LG");  
+  irsend.sendNEC(code, 32); 
+//  flash(4);
 }
 
-void muteVolume()
+void toggleSam(int code)
 {
-  debugPrintln("Sending IR command to toggle mute"); 
-  irsend.sendNEC(mute, 32); 
+  Serial.println("Sending IR toggle command to Samsung"); 
+  irsend.sendSAMSUNG(code, 32); 
+//  flash(4);
 }
 
-void volumeUp()
+void volumeLG(int code, unsigned char value)
 {
-  debugPrintln("Sending IR command to turn volume up"); 
-  irsend.sendNEC(up, 32); 
+  if (value != 255)
+  {
+    Serial.println("Sending IR command to change LG volume"); 
+    int count = ( int(value) * 100 )/255;
+    for(int i=0;i<count;i++)
+    {
+      irsend.sendNEC(code, 32);
+      delay(10);
+    } 
+    
+  }
+//  flash(4);
 }
 
-void volumeDown()
+void volumeSam(int code, unsigned char value)
 {
-  debugPrintln("Sending IR command to turn volume down"); 
-  irsend.sendNEC(down, 32, 2); 
+  if (value != 255)
+  {
+    Serial.println("Sending IR command to change LG volume"); 
+    int count = ( int(value) * 100 )/255;
+    for(int i=0;i<count;i++)
+    {
+      irsend.sendSAMSUNG(code, 32, 2);
+      delay(50);
+    } 
+  }
+//  flash(4);
 }
 
+//void flash(int skip){
+//  for(int16_t i=0; i<255-skip; i+=skip){
+//    for(int16_t j=0; j<strip.numPixels(); j++){
+//      strip.setPixelColor(j,0,0,i);
+//      strip.show();
+//    }}
+//    for(int16_t j=0; j<strip.numPixels(); j++){
+//      strip.setPixelColor(j,0,0,255);
+//      strip.show();
+//    }
+//      for(int16_t i=255; i>skip; i=i-skip){
+//    for(int16_t j=0; j<strip.numPixels(); j++){
+//      strip.setPixelColor(j,0,0,i);
+//      strip.show();
+//    }}
+//    for(int16_t j=0; j<strip.numPixels(); j++){
+//      strip.setPixelColor(j,0,0,0);
+//      strip.show();
+//    }}
