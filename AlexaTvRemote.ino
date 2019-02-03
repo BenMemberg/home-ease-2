@@ -11,7 +11,10 @@ IRsend* irSend;                 // infrared sender
 Wemulator* wemulator;           // wemo emulator
 
 //This is used as a crude workaround for a threading issue
-bool commandReceived = false;   // command flag
+bool togglePower = false;   // command flag
+bool toggleMute = false;   // command flag
+bool volumeUp = false;   // command flag
+bool volumeDown = false;   // command flag
 
 //SET YOUR WIFI CREDS 
 const char* myWifiSsid      = "mina"; 
@@ -26,6 +29,9 @@ const char* myWifiPassword  = "HappyTime";
 
 //turn on/off the tv by sending IR command
 void toggleTv();
+void muteVolume();
+void volumeUp();
+void volumeDown();
 void blinkLed(int, int);
 
 
@@ -58,9 +64,11 @@ void setup()
   {
     wemulator->begin();
     
-    wemulator->addDevice("tv", 80, new WemoCallbackHandler(&commandReceived)); 
-    wemulator->addDevice("television", 81, new WemoCallbackHandler(&commandReceived)); 
-    wemulator->addDevice("my tv", 82, new WemoCallbackHandler(&commandReceived)); 
+    wemulator->addDevice("tv", 80, new WemoCallbackHandler(&togglePower)); 
+    wemulator->addDevice("tv mute", 80, new WemoCallbackHandler(&toggleMute)); 
+    wemulator->addDevice("tv volume up", 80, new WemoCallbackHandler(&volumeUp)); 
+    wemulator->addDevice("tv volume down", 80, new WemoCallbackHandler(&volumeDown)); 
+
   }
 }
 
@@ -78,11 +86,32 @@ void loop()
   }
 
   //if we've received a command, do the action 
-  if (commandReceived)
+  if (togglePower)
   {
-    debugPrintln("COMMAND OUTGOING:");
-    commandReceived = false; 
+    debugPrintln("TOGGLE TV COMMAND OUTGOING:");
+    togglePower = false; 
     toggleTv(); 
+    delay(100); 
+  }
+  if (toggleMute)
+  {
+    debugPrintln("TOGGLE MUTE COMMAND OUTGOING:");
+    toggleMute = false; 
+    toggleMute(); 
+    delay(100); 
+  }
+  if (volumeUp)
+  {
+    debugPrintln("VOLUME UP COMMAND OUTGOING:");
+    volumeUp = false; 
+    volumeUp(); 
+    delay(100); 
+  }
+  if (volumeDown)
+  {
+    debugPrintln("VOLUME DOWN COMMAND OUTGOING:");
+    volumeDown = false; 
+    volumeDown(); 
     delay(100); 
   }
 }
@@ -93,14 +122,50 @@ void loop()
 //
 void toggleTv()
 {
-  debugPrintln("Sending IR command"); 
+  debugPrintln("Sending IR command to toggle tv"); 
   //irSend->sendLG(0x00FFE01FUL, 32, 2); 
 
   // 0x20DF10EF is the command code 
   // 32 is the number of bits in the command 
   // 2 is the number of times it will transmit/repeat the command. Sometimes 1 time is not 
   //    enough to get the command across. you can change this number if you wish 
-  irSend->sendNEC(0x20DF10EF, 32, 2); 
+  //irSend->sendNEC(0x20DF10EF, 32, 2); 
+}
+
+void muteVolume()
+{
+  debugPrintln("Sending IR command to toggle mute"); 
+  //irSend->sendLG(0x00FFE01FUL, 32, 2); 
+
+  // 0x20DF10EF is the command code 
+  // 32 is the number of bits in the command 
+  // 2 is the number of times it will transmit/repeat the command. Sometimes 1 time is not 
+  //    enough to get the command across. you can change this number if you wish 
+  //irSend->sendNEC(0x20DF10EF, 32, 2); 
+}
+
+void volumeUp()
+{
+  debugPrintln("Sending IR command to turn volume up"); 
+  //irSend->sendLG(0x00FFE01FUL, 32, 2); 
+
+  // 0x20DF10EF is the command code 
+  // 32 is the number of bits in the command 
+  // 2 is the number of times it will transmit/repeat the command. Sometimes 1 time is not 
+  //    enough to get the command across. you can change this number if you wish 
+  //irSend->sendNEC(0x20DF10EF, 32, 2); 
+}
+
+void volumeDown()
+{
+  debugPrintln("Sending IR command to turn volume down"); 
+  //irSend->sendLG(0x00FFE01FUL, 32, 2); 
+
+  // 0x20DF10EF is the command code 
+  // 32 is the number of bits in the command 
+  // 2 is the number of times it will transmit/repeat the command. Sometimes 1 time is not 
+  //    enough to get the command across. you can change this number if you wish 
+  //irSend->sendNEC(0x20DF10EF, 32, 2); 
 }
 
 // ************************************************************************************
