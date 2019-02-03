@@ -4,31 +4,42 @@
 #include "Wemulator.h"
 #include "WemoCallbackHandler.h"
 #include <IRsend.h>    // IR library 
+#include <IRrecv.h>
+#include <IRutils.h>
+
+const uint16_t kRecvPin = 14;
+const uint16_t kIrLed = 5;  // ESP8266 GPIO pin to use. Recommended: 4 (D2).
+int power=0x0020DF10EF;
+int up=0x0020DF40BF;
+int down=0x0020DFC03F;
+int mute=0x0020DF906F;
+int input=0x0020DFD02F;
 
 
 WifiConnection* wifi;           // wifi connection
-IRsend* irSend;                 // infrared sender
+IRsend irsend(kIrLed);  // Set the GPIO to be used to sending the message.
+IRrecv irrecv(kRecvPin);
 Wemulator* wemulator;           // wemo emulator
 
 //This is used as a crude workaround for a threading issue
-bool togglePower = false;   // command flag
-bool toggleMute = false;   // command flag
-bool volumeUp = false;   // command flag
-bool volumeDown = false;   // command flag
+bool Power = false;   // command flag
+bool Mute = false;   // command flag
+bool Up = false;   // command flag
+bool Down = false;   // command flag
 
 //SET YOUR WIFI CREDS 
-const char* myWifiSsid      = "mina"; 
-const char* myWifiPassword  = "HappyTime";
+const char* myWifiSsid      = "WiFi@OSU"; 
+const char* myWifiPassword  = "";
 
 //SET TO MATCH YOUR HARDWARE 
-#define SERIAL_BAUD_RATE    9600
+#define SERIAL_BAUD_RATE    115200
 
 //PIN 0 is D3 ON THE CHIP 
 #define IR_PIN              0
 #define LED_PIN             2
 
 //turn on/off the tv by sending IR command
-void toggleTv();
+void togglePower();
 void muteVolume();
 void volumeUp();
 void volumeDown();
@@ -44,13 +55,10 @@ void setup()
   Serial.begin(SERIAL_BAUD_RATE);
 
   //initialize the IR 
-  irSend = new IRsend(IR_PIN, true);
-  irSend->begin();
-
-  //make sure that the IR pin is OFF
-  // *** NOTE: HIGH and LOW may be reversed on your device. In which case, replace this call with:
-  //          digitalWrite(IR_PIN, LOW);
-  digitalWrite(IR_PIN, HIGH);
+  IRsend irsend(kIrLed);  // Set the GPIO to be used to sending the message.
+  IRrecv irrecv(kRecvPin);
+  irsend.begin();
+  irrecv.enableIRIn();  // Start the receiver
 
   //initialize wifi connection 
   wifi = new WifiConnection(myWifiSsid, myWifiPassword); 
@@ -64,10 +72,10 @@ void setup()
   {
     wemulator->begin();
     
-    wemulator->addDevice("tv", 80, new WemoCallbackHandler(&togglePower)); 
-    wemulator->addDevice("tv mute", 80, new WemoCallbackHandler(&toggleMute)); 
-    wemulator->addDevice("tv volume up", 80, new WemoCallbackHandler(&volumeUp)); 
-    wemulator->addDevice("tv volume down", 80, new WemoCallbackHandler(&volumeDown)); 
+    wemulator->addDevice("tv", 80, new WemoCallbackHandler(&Power)); 
+    wemulator->addDevice("tv mute", 80, new WemoCallbackHandler(&Mute)); 
+    wemulator->addDevice("tv volume up", 80, new WemoCallbackHandler(&Up)); 
+    wemulator->addDevice("tv volume down", 80, new WemoCallbackHandler(&Down)); 
 
   }
 }
@@ -86,31 +94,31 @@ void loop()
   }
 
   //if we've received a command, do the action 
-  if (togglePower)
+  if (Power)
   {
     debugPrintln("TOGGLE TV COMMAND OUTGOING:");
-    togglePower = false; 
+    Power = false; 
     toggleTv(); 
     delay(100); 
   }
-  if (toggleMute)
+  if (Mute)
   {
     debugPrintln("TOGGLE MUTE COMMAND OUTGOING:");
-    toggleMute = false; 
-    toggleMute(); 
+    Mute = false; 
+    muteVolume(); 
     delay(100); 
   }
-  if (volumeUp)
+  if (Up)
   {
     debugPrintln("VOLUME UP COMMAND OUTGOING:");
-    volumeUp = false; 
+    Up = false; 
     volumeUp(); 
     delay(100); 
   }
-  if (volumeDown)
+  if (Down)
   {
     debugPrintln("VOLUME DOWN COMMAND OUTGOING:");
-    volumeDown = false; 
+    Down = false; 
     volumeDown(); 
     delay(100); 
   }
@@ -122,50 +130,26 @@ void loop()
 //
 void toggleTv()
 {
-  debugPrintln("Sending IR command to toggle tv"); 
-  //irSend->sendLG(0x00FFE01FUL, 32, 2); 
-
-  // 0x20DF10EF is the command code 
-  // 32 is the number of bits in the command 
-  // 2 is the number of times it will transmit/repeat the command. Sometimes 1 time is not 
-  //    enough to get the command across. you can change this number if you wish 
-  //irSend->sendNEC(0x20DF10EF, 32, 2); 
+  debugPrintln("Sending IR command to toggle tv");  
+  irsend.sendNEC(power, 32); 
 }
 
 void muteVolume()
 {
   debugPrintln("Sending IR command to toggle mute"); 
-  //irSend->sendLG(0x00FFE01FUL, 32, 2); 
-
-  // 0x20DF10EF is the command code 
-  // 32 is the number of bits in the command 
-  // 2 is the number of times it will transmit/repeat the command. Sometimes 1 time is not 
-  //    enough to get the command across. you can change this number if you wish 
-  //irSend->sendNEC(0x20DF10EF, 32, 2); 
+  irsend.sendNEC(mute, 32); 
 }
 
 void volumeUp()
 {
   debugPrintln("Sending IR command to turn volume up"); 
-  //irSend->sendLG(0x00FFE01FUL, 32, 2); 
-
-  // 0x20DF10EF is the command code 
-  // 32 is the number of bits in the command 
-  // 2 is the number of times it will transmit/repeat the command. Sometimes 1 time is not 
-  //    enough to get the command across. you can change this number if you wish 
-  //irSend->sendNEC(0x20DF10EF, 32, 2); 
+  irsend.sendNEC(up, 32); 
 }
 
 void volumeDown()
 {
   debugPrintln("Sending IR command to turn volume down"); 
-  //irSend->sendLG(0x00FFE01FUL, 32, 2); 
-
-  // 0x20DF10EF is the command code 
-  // 32 is the number of bits in the command 
-  // 2 is the number of times it will transmit/repeat the command. Sometimes 1 time is not 
-  //    enough to get the command across. you can change this number if you wish 
-  //irSend->sendNEC(0x20DF10EF, 32, 2); 
+  irsend.sendNEC(down, 32, 2); 
 }
 
 // ************************************************************************************
